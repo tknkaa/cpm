@@ -2,84 +2,47 @@ package main
 
 import (
 	"fmt"
-	"os"
-
-	tea "github.com/charmbracelet/bubbletea"
+	"strings"
+	"time"
 )
 
-type model struct {
-	choices  []string
-	cursor   int
-	selected map[int]struct{}
-}
+const (
+	// カーソル制御
+	CursorHide  = "\x1b[?25l"
+	CursorShow  = "\x1b[?25h"
+	ReturnStart = "\r"
 
-func initialModel() model {
-	return model{
-		choices:  []string{"Bur carrots", "But celery", "Buy kohrabi"},
-		selected: make(map[int]struct{}),
-	}
-}
-
-func (m model) Init() tea.Cmd {
-	return nil
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-
-		case "ctrl+c", "q":
-			return m, tea.Quit
-
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-
-		case "down", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-
-		case "enter", " ":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
-			}
-		}
-	}
-	return m, nil
-}
-
-func (m model) View() string {
-	s := "What should we buy at the market?\n\n"
-
-	for i, choice := range m.choices {
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
-
-		checked := " "
-		if _, ok := m.selected[i]; ok {
-			checked = "x"
-		}
-
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
-	}
-
-	s += "\nPress q to quit.\n"
-
-	return s
-}
+	// 色設定（ここが変更点！）
+	BgGreen = "\x1b[42m" // 背景を緑にする
+	BgReset = "\x1b[0m"  // 色設定（背景・文字）をリセット
+)
 
 func main() {
-	p := tea.NewProgram(initialModel())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
-		os.Exit(1)
+	total := 50 // バーの長さ（スペースの個数）
+
+	fmt.Print(CursorHide)
+	defer fmt.Print(CursorShow)
+
+	fmt.Println("背景色を使ったプログレスバー:")
+
+	for i := 0; i <= 100; i++ {
+		percent := i
+		filledLen := (total * percent) / 100
+
+		// 1. 進捗部分は「背景緑」＋「スペース」
+		// 背景色が緑になっているので、ただの空白が「緑のブロック」に見える
+		filled := BgGreen + strings.Repeat(" ", filledLen)
+
+		// 2. 未完了部分は「リセット（デフォルト背景）」＋「スペース」
+		// ここは何も色がついていないただの空白になる
+		empty := BgReset + strings.Repeat(" ", total-filledLen)
+
+		// 3. 描画
+		// \r で戻る -> 緑の空白 -> 普通の空白 -> 数字
+		fmt.Printf("%s%s%s %d%%", ReturnStart, filled, empty, percent)
+
+		time.Sleep(50 * time.Millisecond)
 	}
+
+	fmt.Println("\nDone!")
 }
