@@ -1,7 +1,10 @@
 [package]
 name = "cpm"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+description = "A TUI tool to track your GitHub Copilot Premium request quota"
+license = "MIT"
+repository = "https://github.com/tknkaa/cpm"
 
 [[bin]]
 name = "cpm"

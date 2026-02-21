@@ -6,16 +6,10 @@ A TUI tool that compares your remaining GitHub Copilot Premium requests against 
 
 ## Installation
 
-### Nix
-
-```bash
-nix profile install github:yourname/cpm
-```
-
 ### cargo
 
 ```bash
-cargo install --git https://github.com/yourname/cpm
+cargo install --git https://github.com/tknkaa/cpm
 ```
 
 ## Usage
