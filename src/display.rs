@@ -213,7 +213,7 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
                 data.reset_date.format("%Y-%m-%d"),
                 data.days_remaining
             ),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(Color::White),
         ),
     ]))
     .block(Block::default().borders(Borders::BOTTOM));
@@ -223,11 +223,14 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
     // One gauge per tracked quota
     for quota in &tracked {
         let color = pace_color(quota.percent_used(), data.days_remaining, data.days_total);
-        let label = format!(
-            "{}/{} used ({:.1}% remaining)",
-            quota.entitlement - quota.remaining,
-            quota.entitlement,
-            quota.percent_remaining
+        let label = Span::styled(
+            format!(
+                "{}/{} used ({:.1}% remaining)",
+                quota.entitlement - quota.remaining,
+                quota.entitlement,
+                quota.percent_remaining
+            ),
+            Style::default().fg(Color::Black),
         );
         let gauge = Gauge::default()
             .block(
@@ -254,10 +257,13 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
         )
         .gauge_style(Style::default().fg(Color::Blue))
         .percent(month_used_pct)
-        .label(format!(
-            "{} / {} days elapsed",
-            data.days_total - data.days_remaining,
-            data.days_total
+        .label(Span::styled(
+            format!(
+                "{} / {} days elapsed",
+                data.days_total - data.days_remaining,
+                data.days_total
+            ),
+            Style::default().fg(Color::Black),
         ));
     frame.render_widget(month_gauge, chunks[idx]);
     idx += 2;
