@@ -10,14 +10,14 @@ use quota::{DisplayData, QuotaInfo};
 
 #[derive(Parser)]
 #[command(name = "cpm")]
-#[command(about = "Compare GitHub Copilot quota remaining and remaining days in the month")]
+#[command(about = "Compare your GitHub Copilot quota against the days left in the billing cycle")]
 struct Cli {
     /// Display style
     #[arg(long, value_enum, default_value = "progress")]
     style: DisplayStyle,
 
-    /// Manually specify the remaining percentage of Premium requests (0-100)
-    /// If specified, displays using this value without using gh CLI
+    /// Manually specify the remaining Premium request percentage (0-100).
+    /// Skips the GitHub API call when provided.
     #[arg(long, value_name = "PERCENT")]
     premium: Option<f64>,
 }
@@ -26,28 +26,20 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let data = if let Some(pct) = cli.premium {
-        // Directly specified with --premium
         if !(0.0..=100.0).contains(&pct) {
-            anyhow::bail!("Please specify a value between 0-100 for --premium");
+            anyhow::bail!("--premium must be between 0 and 100");
         }
         build_data_from_percent(pct, 300)
     } else {
-        // Attempt to fetch via gh CLI
         match api::fetch() {
             Ok(response) => {
-                let pi = &response.quota_snapshots.premium_interactions;
+                let s = &response.quota_snapshots;
                 let (days_remaining, days_total) = calc_days(&response.quota_reset_date_utc);
                 DisplayData {
                     quotas: vec![
-                        unlimited_quota("Chat"),
-                        unlimited_quota("Code Completion"),
-                        QuotaInfo {
-                            label: "Premium".into(),
-                            entitlement: pi.entitlement,
-                            remaining: pi.remaining,
-                            unlimited: false,
-                            percent_remaining: pi.percent_remaining,
-                        },
+                        quota_from_entry("Chat", &s.chat),
+                        quota_from_entry("Code Completions", &s.completions),
+                        quota_from_entry("Premium", &s.premium_interactions),
                     ],
                     days_remaining,
                     days_total,
@@ -55,8 +47,7 @@ fn main() -> Result<()> {
                 }
             }
             Err(e) => {
-                // If failed, prompt for percentage in TUI
-                eprintln!("Failed to fetch via gh CLI: {}", e);
+                eprintln!("Failed to fetch via GitHub API: {}", e);
                 let pct = display::prompt_premium_percent()?;
                 build_data_from_percent(pct, 300)
             }
@@ -67,7 +58,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Build DisplayData from percentage and limit (assumes reset date is the 1st of next month)
+/// Build DisplayData from a manually provided percentage.
+/// Reset date is assumed to be the first day of next month.
 fn build_data_from_percent(percent_remaining: f64, entitlement: u64) -> DisplayData {
     let now = Utc::now();
     let reset = next_month_start(now.year(), now.month());
@@ -76,8 +68,20 @@ fn build_data_from_percent(percent_remaining: f64, entitlement: u64) -> DisplayD
 
     DisplayData {
         quotas: vec![
-            unlimited_quota("Chat"),
-            unlimited_quota("Code Completion"),
+            QuotaInfo {
+                label: "Chat".into(),
+                entitlement: 0,
+                remaining: 0,
+                unlimited: true,
+                percent_remaining: 100.0,
+            },
+            QuotaInfo {
+                label: "Code Completions".into(),
+                entitlement: 0,
+                remaining: 0,
+                unlimited: true,
+                percent_remaining: 100.0,
+            },
             QuotaInfo {
                 label: "Premium".into(),
                 entitlement,
@@ -92,13 +96,13 @@ fn build_data_from_percent(percent_remaining: f64, entitlement: u64) -> DisplayD
     }
 }
 
-fn unlimited_quota(label: &str) -> QuotaInfo {
+fn quota_from_entry(label: &str, entry: &quota::QuotaEntry) -> QuotaInfo {
     QuotaInfo {
         label: label.into(),
-        entitlement: 0,
-        remaining: 0,
-        unlimited: true,
-        percent_remaining: 100.0,
+        entitlement: entry.entitlement,
+        remaining: entry.remaining,
+        unlimited: entry.unlimited,
+        percent_remaining: entry.percent_remaining,
     }
 }
 

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-/// Response structure of gh api /copilot_internal/user
+/// Response structure for GET /copilot_internal/user
 #[derive(Debug, Deserialize)]
 pub struct CopilotUserResponse {
     pub quota_snapshots: QuotaSnapshots,
@@ -10,6 +10,8 @@ pub struct CopilotUserResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct QuotaSnapshots {
+    pub chat: QuotaEntry,
+    pub completions: QuotaEntry,
     pub premium_interactions: QuotaEntry,
 }
 
@@ -17,10 +19,11 @@ pub struct QuotaSnapshots {
 pub struct QuotaEntry {
     pub entitlement: u64,
     pub remaining: u64,
+    pub unlimited: bool,
     pub percent_remaining: f64,
 }
 
-/// Normalized quota information for display and comparison
+/// Normalized quota info used for display and comparison
 #[derive(Debug, Clone)]
 pub struct QuotaInfo {
     pub label: String,
@@ -39,7 +42,7 @@ impl QuotaInfo {
     }
 }
 
-/// All data required for display
+/// All data needed for display
 pub struct DisplayData {
     pub quotas: Vec<QuotaInfo>,
     pub days_remaining: i64,

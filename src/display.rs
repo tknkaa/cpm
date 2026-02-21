@@ -1,11 +1,11 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
+    DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{BarChart, Block, Borders, Gauge, Paragraph},
-    DefaultTerminal, Frame,
 };
 
 use crate::quota::{DisplayData, QuotaInfo};
@@ -21,7 +21,7 @@ pub enum DisplayStyle {
 // TUI input form (when --premium is not specified)
 // ────────────────────────────────────────────
 
-/// Prompt for the remaining percentage of premium_interactions in the TUI
+/// Prompt for the remaining percentage of premium_interactions in the TUI.
 /// Example input: "23.4" → returns 23.4f64
 pub fn prompt_premium_percent() -> Result<f64> {
     color_eyre::install().ok();
@@ -47,8 +47,8 @@ fn run_prompt(terminal: &mut DefaultTerminal) -> std::io::Result<f64> {
             match key.code {
                 KeyCode::Enter => match input.trim().parse::<f64>() {
                     Ok(v) if (0.0..=100.0).contains(&v) => return Ok(v),
-                    Ok(_) => error = Some("Please enter a value between 0-100".into()),
-                    Err(_) => error = Some("Please enter a number (e.g., 23.4)".into()),
+                    Ok(_) => error = Some("Please enter a value between 0 and 100".into()),
+                    Err(_) => error = Some("Please enter a number (e.g. 23.4)".into()),
                 },
                 KeyCode::Char(c) if c.is_ascii_digit() || c == '.' => {
                     input.push(c);
@@ -91,7 +91,7 @@ fn render_prompt(frame: &mut Frame, input: &str, error: Option<&str>) {
     frame.render_widget(block, popup);
 
     let desc = Paragraph::new(
-        "Failed to fetch via gh CLI.\nPlease enter the remaining percentage confirmed with `gh copilot status` etc.",
+        "Failed to fetch via gh CLI.\nPlease enter the remaining percentage from your GitHub billing settings.",
     )
     .style(Style::default().fg(Color::Gray));
     frame.render_widget(desc, chunks[0]);
@@ -114,7 +114,7 @@ fn render_prompt(frame: &mut Frame, input: &str, error: Option<&str>) {
     frame.render_widget(hint, chunks[2]);
 }
 
-/// Create a popup area in the center of the area
+/// Create a centered popup rect within the given area.
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let vert = Layout::default()
         .direction(Direction::Vertical)
@@ -175,8 +175,21 @@ fn render(frame: &mut Frame, data: &DisplayData, style: &DisplayStyle) {
 
 fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
     let tracked: Vec<&QuotaInfo> = data.quotas.iter().filter(|q| !q.unlimited).collect();
-    let row_count = 2 + tracked.len() * 2 + 2 + 2;
-    let constraints: Vec<Constraint> = (0..row_count).map(|_| Constraint::Length(3)).collect();
+
+    // Build constraints dynamically to avoid index-out-of-bounds when
+    // the number of tracked quotas changes (e.g. chat becomes limited).
+    // Layout: title(1 row + 1 separator) + each quota(1 row each) + month gauge + footer
+    let mut constraints = vec![
+        Constraint::Length(3), // title
+        Constraint::Length(1), // separator
+    ];
+    for _ in &tracked {
+        constraints.push(Constraint::Length(3)); // gauge per quota
+        constraints.push(Constraint::Length(1)); // gap
+    }
+    constraints.push(Constraint::Length(3)); // month progress gauge
+    constraints.push(Constraint::Length(1)); // gap
+    constraints.push(Constraint::Min(2)); // footer
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -186,6 +199,7 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
 
     let mut idx = 0;
 
+    // Title
     let title = Paragraph::new(Line::from(vec![
         Span::styled(
             " GitHub Copilot Quota ",
@@ -206,6 +220,7 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
     frame.render_widget(title, chunks[idx]);
     idx += 2;
 
+    // One gauge per tracked quota
     for quota in &tracked {
         let color = pace_color(quota.percent_used(), data.days_remaining, data.days_total);
         let label = format!(
@@ -227,8 +242,10 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
         idx += 2;
     }
 
-    let month_used_pct =
-        ((data.days_total - data.days_remaining) as f64 / data.days_total as f64 * 100.0) as u16;
+    // Month progress gauge
+    let month_used_pct = ((data.days_total - data.days_remaining) as f64
+        / data.days_total.max(1) as f64
+        * 100.0) as u16;
     let month_gauge = Gauge::default()
         .block(
             Block::default()
@@ -238,13 +255,14 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
         .gauge_style(Style::default().fg(Color::Blue))
         .percent(month_used_pct)
         .label(format!(
-            "{} days / {} days elapsed",
+            "{} / {} days elapsed",
             data.days_total - data.days_remaining,
             data.days_total
         ));
     frame.render_widget(month_gauge, chunks[idx]);
     idx += 2;
 
+    // Footer with pace summary
     let footer = Paragraph::new(pace_summary(data)).block(Block::default().borders(Borders::TOP));
     frame.render_widget(footer, chunks[idx]);
 }
@@ -316,7 +334,7 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
 }
 
 // ────────────────────────────────────────────
-// Graph (bar graph) display
+// Graph (bar chart) display
 // ────────────────────────────────────────────
 
 fn render_graph(frame: &mut Frame, area: Rect, data: &DisplayData) {
@@ -363,9 +381,10 @@ fn render_graph(frame: &mut Frame, area: Rect, data: &DisplayData) {
 }
 
 // ────────────────────────────────────────────
-// Helper
+// Helpers
 // ────────────────────────────────────────────
 
+/// Returns a color based on how the quota usage pace compares to the month progress.
 fn pace_color(percent_used: f64, days_remaining: i64, days_total: i64) -> Color {
     let month_used_pct = (days_total - days_remaining) as f64 / days_total.max(1) as f64 * 100.0;
     let diff = percent_used - month_used_pct;
@@ -378,6 +397,7 @@ fn pace_color(percent_used: f64, days_remaining: i64, days_total: i64) -> Color 
     }
 }
 
+/// Returns a short pace label based on how quota usage compares to month progress.
 fn pace_label(percent_used: f64, days_remaining: i64, days_total: i64) -> &'static str {
     let month_used_pct = (days_total - days_remaining) as f64 / days_total.max(1) as f64 * 100.0;
     let diff = percent_used - month_used_pct;
@@ -392,6 +412,7 @@ fn pace_label(percent_used: f64, days_remaining: i64, days_total: i64) -> &'stat
     }
 }
 
+/// Summarizes pace for all tracked (non-unlimited) quotas.
 fn pace_summary(data: &DisplayData) -> String {
     let messages: Vec<String> = data
         .quotas
