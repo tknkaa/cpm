@@ -269,7 +269,15 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
     idx += 2;
 
     // Footer with pace summary
-    let footer = Paragraph::new(pace_summary(data)).block(Block::default().borders(Borders::TOP));
+    let mut footer_lines = vec![Line::from(pace_summary(data))];
+    if let Some(budget_text) = daily_budget_text(data) {
+        footer_lines.push(Line::from(""));
+        footer_lines.push(Line::from(Span::styled(
+            budget_text,
+            Style::default().fg(Color::Cyan),
+        )));
+    }
+    let footer = Paragraph::new(footer_lines).block(Block::default().borders(Borders::TOP));
     frame.render_widget(footer, chunks[idx]);
 }
 
@@ -325,6 +333,15 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(pace_summary(data)));
+
+    if let Some(budget_text) = daily_budget_text(data) {
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            budget_text,
+            Style::default().fg(Color::Cyan),
+        )));
+    }
+
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  [Press any key to exit]",
@@ -347,7 +364,7 @@ fn render_graph(frame: &mut Frame, area: Rect, data: &DisplayData) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints([Constraint::Min(10), Constraint::Length(3)])
+        .constraints([Constraint::Min(10), Constraint::Length(5)])
         .split(area);
 
     let month_used_pct =
@@ -382,7 +399,15 @@ fn render_graph(frame: &mut Frame, area: Rect, data: &DisplayData) {
         );
     frame.render_widget(chart, chunks[0]);
 
-    let footer = Paragraph::new(pace_summary(data)).block(Block::default().borders(Borders::TOP));
+    let mut footer_lines = vec![Line::from(pace_summary(data))];
+    if let Some(budget_text) = daily_budget_text(data) {
+        footer_lines.push(Line::from(""));
+        footer_lines.push(Line::from(Span::styled(
+            budget_text,
+            Style::default().fg(Color::Cyan),
+        )));
+    }
+    let footer = Paragraph::new(footer_lines).block(Block::default().borders(Borders::TOP));
     frame.render_widget(footer, chunks[1]);
 }
 
@@ -435,4 +460,20 @@ fn pace_summary(data: &DisplayData) -> String {
     } else {
         messages.join("  |  ")
     }
+}
+
+/// Calculate daily budget for premium requests remaining
+fn daily_budget_text(data: &DisplayData) -> Option<String> {
+    // Find the Premium quota
+    let premium = data.quotas.iter().find(|q| q.label == "Premium")?;
+
+    if premium.unlimited || data.days_remaining <= 0 {
+        return None;
+    }
+
+    let daily_budget = premium.remaining as f64 / data.days_remaining as f64;
+    Some(format!(
+        "You can use up to {:.1} premium requests per day until reset",
+        daily_budget
+    ))
 }
