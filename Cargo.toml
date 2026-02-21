@@ -1,6 +1,19 @@
 [package]
 name = "cpm"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[[bin]]
+name = "cpm"
+path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ratatui = "0.29"
+crossterm = "0.28"
+color-eyre = "0.6"
+chrono = { version = "0.4", features = ["serde"] }
+anyhow = "1"
+reqwest = { version = "0.12", features = ["blocking", "json", "rustls-tls"], default-features = false }
