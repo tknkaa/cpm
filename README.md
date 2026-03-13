@@ -2,6 +2,11 @@
 
 A TUI tool that compares your remaining GitHub Copilot Premium requests against the days left in the billing cycle.
 
+> [!WARNING]
+> This tool uses GitHub Copilot's internal API, which is unofficial and not intended for external use.
+> It may break without notice if GitHub changes their API.
+> Use at your own risk.
+
 ![demo](demo.png)
 
 ## Installation
