@@ -107,8 +107,7 @@ fn render_prompt(frame: &mut Frame, input: &str, error: Option<&str>) {
     let hint = if let Some(e) = error {
         Paragraph::new(e).style(Style::default().fg(Color::Red))
     } else {
-        Paragraph::new("Enter to confirm  /  Esc to cancel")
-            .style(Style::default().fg(Color::DarkGray))
+        Paragraph::new("Enter to confirm  /  Esc to cancel").style(Style::default().fg(Color::Gray))
     };
     frame.render_widget(hint, chunks[2]);
 }
