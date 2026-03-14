@@ -221,24 +221,18 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
     // One gauge per tracked quota
     for quota in &tracked {
         let color = pace_color(quota.percent_used(), data.days_remaining, data.days_total);
-        let label = Span::styled(
-            format!(
-                "{}/{} used ({:.1}% remaining)",
-                quota.entitlement - quota.remaining,
-                quota.entitlement,
-                quota.percent_remaining
-            ),
-            Style::default().fg(Color::Black),
+        let title = format!(
+            "{}  {}/{} used  ({:.1}% remaining)",
+            quota.label,
+            quota.entitlement - quota.remaining,
+            quota.entitlement,
+            quota.percent_remaining,
         );
         let gauge = Gauge::default()
-            .block(
-                Block::default()
-                    .title(quota.label.clone())
-                    .borders(Borders::ALL),
-            )
+            .block(Block::default().title(title).borders(Borders::ALL))
             .gauge_style(Style::default().fg(color))
             .percent(quota.percent_used() as u16)
-            .label(label);
+            .label("");
         frame.render_widget(gauge, chunks[idx]);
         idx += 2;
     }
@@ -247,22 +241,17 @@ fn render_progress(frame: &mut Frame, area: Rect, data: &DisplayData) {
     let month_used_pct = ((data.days_total - data.days_remaining) as f64
         / data.days_total.max(1) as f64
         * 100.0) as u16;
+    let month_title = format!(
+        "Month Progress  {} / {} days elapsed  ({}% elapsed)",
+        data.days_total - data.days_remaining,
+        data.days_total,
+        month_used_pct,
+    );
     let month_gauge = Gauge::default()
-        .block(
-            Block::default()
-                .title("Month Progress")
-                .borders(Borders::ALL),
-        )
+        .block(Block::default().title(month_title).borders(Borders::ALL))
         .gauge_style(Style::default().fg(Color::Blue))
         .percent(month_used_pct)
-        .label(Span::styled(
-            format!(
-                "{} / {} days elapsed",
-                data.days_total - data.days_remaining,
-                data.days_total
-            ),
-            Style::default().fg(Color::Black),
-        ));
+        .label("");
     frame.render_widget(month_gauge, chunks[idx]);
     idx += 2;
 
@@ -312,7 +301,6 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
             ]));
         } else {
             let color = pace_color(quota.percent_used(), data.days_remaining, data.days_total);
-            let pace = pace_label(quota.percent_used(), data.days_remaining, data.days_total);
             lines.push(Line::from(vec![
                 Span::styled(
                     format!("  {:20}", quota.label),
@@ -320,8 +308,8 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
                 ),
                 Span::styled(
                     format!(
-                        "Remaining {:4} / {:4}  ({:5.1}% remaining)  {}",
-                        quota.remaining, quota.entitlement, quota.percent_remaining, pace
+                        "{:4} /{:4}  ({:5.1}% remaining)",
+                        quota.remaining, quota.entitlement, quota.percent_remaining
                     ),
                     Style::default().fg(color),
                 ),
@@ -342,8 +330,8 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  [Press any key to exit]",
-        Style::default().fg(Color::DarkGray),
+        "[Press any key to exit]",
+        Style::default().fg(Color::Gray),
     )));
 
     let para = Paragraph::new(lines).block(

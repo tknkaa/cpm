@@ -24,11 +24,14 @@ cargo install --git https://github.com/tknkaa/cpm
 cpm
 
 # Choose a display style
-cpm --style progress  # default
+cpm -s progress   # default
+cpm -s text
+cpm --style progress
 cpm --style text
 
 # Skip API fetch and specify remaining percentage directly
-cpm --premium 23.4
+cpm -p 23.4
+cpm --percent 23.4
 ```
 
 Press any key to exit.

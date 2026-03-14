@@ -13,21 +13,21 @@ use quota::{DisplayData, QuotaInfo};
 #[command(about = "Compare your GitHub Copilot quota against the days left in the billing cycle")]
 struct Cli {
     /// Display style
-    #[arg(long, value_enum, default_value = "progress")]
+    #[arg(short = 's', long, value_enum, default_value = "progress")]
     style: DisplayStyle,
 
     /// Manually specify the remaining Premium request percentage (0-100).
     /// Skips the GitHub API call when provided.
-    #[arg(long, value_name = "PERCENT")]
-    premium: Option<f64>,
+    #[arg(short = 'p', long, value_name = "PERCENT")]
+    percent: Option<f64>,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let data = if let Some(pct) = cli.premium {
+    let data = if let Some(pct) = cli.percent {
         if !(0.0..=100.0).contains(&pct) {
-            anyhow::bail!("--premium must be between 0 and 100");
+            anyhow::bail!("--percent must be between 0 and 100");
         }
         build_data_from_percent(pct, 300)
     } else {
