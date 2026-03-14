@@ -1,11 +1,11 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
+    DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Gauge, Paragraph},
-    DefaultTerminal, Frame,
 };
 
 use crate::quota::{DisplayData, QuotaInfo};
@@ -359,7 +359,7 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
 // ────────────────────────────────────────────
 
 /// Returns a color based on how the quota usage pace compares to the month progress.
-fn pace_color(percent_used: f64, days_remaining: i64, days_total: i64) -> Color {
+pub(crate) fn pace_color(percent_used: f64, days_remaining: i64, days_total: i64) -> Color {
     let month_used_pct = (days_total - days_remaining) as f64 / days_total.max(1) as f64 * 100.0;
     let diff = percent_used - month_used_pct;
     if diff > 15.0 {
@@ -372,7 +372,7 @@ fn pace_color(percent_used: f64, days_remaining: i64, days_total: i64) -> Color 
 }
 
 /// Returns a short pace label based on how quota usage compares to month progress.
-fn pace_label(percent_used: f64, days_remaining: i64, days_total: i64) -> &'static str {
+pub(crate) fn pace_label(percent_used: f64, days_remaining: i64, days_total: i64) -> &'static str {
     let month_used_pct = (days_total - days_remaining) as f64 / days_total.max(1) as f64 * 100.0;
     let diff = percent_used - month_used_pct;
     if diff > 15.0 {
@@ -406,7 +406,7 @@ fn pace_summary(data: &DisplayData) -> String {
 }
 
 /// Calculate daily budget for premium requests remaining
-fn daily_budget_text(data: &DisplayData) -> Option<String> {
+pub(crate) fn daily_budget_text(data: &DisplayData) -> Option<String> {
     // Find the Premium quota
     let premium = data.quotas.iter().find(|q| q.label == "Premium")?;
 
@@ -419,4 +419,229 @@ fn daily_budget_text(data: &DisplayData) -> Option<String> {
         "You can use up to {:.1} premium requests per day until reset",
         daily_budget
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    // ── helpers ────────────────────────────────────────────────────────────
+
+    fn metered(label: &str, remaining: u64, entitlement: u64, percent_remaining: f64) -> QuotaInfo {
+        QuotaInfo {
+            label: label.into(),
+            entitlement,
+            remaining,
+            unlimited: false,
+            percent_remaining,
+        }
+    }
+
+    fn unlimited(label: &str) -> QuotaInfo {
+        QuotaInfo {
+            label: label.into(),
+            entitlement: 0,
+            remaining: 0,
+            unlimited: true,
+            percent_remaining: 100.0,
+        }
+    }
+
+    fn display_data(quotas: Vec<QuotaInfo>, days_remaining: i64, days_total: i64) -> DisplayData {
+        DisplayData {
+            quotas,
+            days_remaining,
+            days_total,
+            reset_date: Utc::now(),
+        }
+    }
+
+    // ── pace_color ─────────────────────────────────────────────────────────
+
+    // diff = percent_used - month_used_pct
+    // month_used_pct = (days_total - days_remaining) / days_total * 100
+    //
+    // For days_total=30, days_remaining=15 → month_used_pct = 50%
+
+    #[test]
+    fn pace_color_red_when_diff_above_15() {
+        // percent_used=70, month_used=50 → diff=20 → Red
+        assert_eq!(pace_color(70.0, 15, 30), Color::Red);
+    }
+
+    #[test]
+    fn pace_color_red_at_boundary_just_above_15() {
+        // diff = 15.01 → Red
+        assert_eq!(pace_color(65.01, 15, 30), Color::Red);
+    }
+
+    #[test]
+    fn pace_color_yellow_when_diff_exactly_15() {
+        // diff == 15.0 → NOT > 15 → falls to Yellow check: 15 > 5 → Yellow
+        assert_eq!(pace_color(65.0, 15, 30), Color::Yellow);
+    }
+
+    #[test]
+    fn pace_color_yellow_when_diff_between_5_and_15() {
+        // percent_used=60, month_used=50 → diff=10 → Yellow
+        assert_eq!(pace_color(60.0, 15, 30), Color::Yellow);
+    }
+
+    #[test]
+    fn pace_color_yellow_at_boundary_just_above_5() {
+        // diff = 5.01 → Yellow
+        assert_eq!(pace_color(55.01, 15, 30), Color::Yellow);
+    }
+
+    #[test]
+    fn pace_color_green_when_diff_exactly_5() {
+        // diff == 5.0 → NOT > 5 → Green
+        assert_eq!(pace_color(55.0, 15, 30), Color::Green);
+    }
+
+    #[test]
+    fn pace_color_green_when_on_pace() {
+        // percent_used==month_used → diff=0 → Green
+        assert_eq!(pace_color(50.0, 15, 30), Color::Green);
+    }
+
+    #[test]
+    fn pace_color_green_when_under_pace() {
+        // percent_used=30, month_used=50 → diff=-20 → Green
+        assert_eq!(pace_color(30.0, 15, 30), Color::Green);
+    }
+
+    #[test]
+    fn pace_color_zero_days_total_uses_max1() {
+        // days_total=0 → denominator clamped to max(1)=1
+        // month_used_pct = (0 - 0) / 1 * 100 = 0%
+        // percent_used=100, diff=100 → Red
+        assert_eq!(pace_color(100.0, 0, 0), Color::Red);
+    }
+
+    // ── pace_label ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn pace_label_overusing_when_diff_above_15() {
+        assert_eq!(pace_label(70.0, 15, 30), "⚠  Overusing");
+    }
+
+    #[test]
+    fn pace_label_slightly_fast_when_diff_between_5_and_15_inclusive() {
+        // diff=10 → Slightly fast
+        assert_eq!(pace_label(60.0, 15, 30), "△  Slightly fast");
+        // boundary: diff=15 exactly → not >15, but >5 → Slightly fast
+        assert_eq!(pace_label(65.0, 15, 30), "△  Slightly fast");
+        // boundary: diff=5 exactly → not >5, not <-10 → Good pace
+        assert_eq!(pace_label(55.0, 15, 30), "✓  Good pace");
+    }
+
+    #[test]
+    fn pace_label_good_pace_when_on_pace() {
+        assert_eq!(pace_label(50.0, 15, 30), "✓  Good pace");
+    }
+
+    #[test]
+    fn pace_label_good_pace_in_dead_zone_minus10_to_0() {
+        // diff=-5 → not <-10 → Good pace
+        assert_eq!(pace_label(45.0, 15, 30), "✓  Good pace");
+        // boundary: diff=-10 exactly → not <-10 → Good pace
+        assert_eq!(pace_label(40.0, 15, 30), "✓  Good pace");
+    }
+
+    #[test]
+    fn pace_label_plenty_left_when_diff_below_minus10() {
+        // diff=-11 → Plenty left
+        assert_eq!(pace_label(39.0, 15, 30), "◎  Plenty left");
+    }
+
+    #[test]
+    fn pace_label_plenty_left_far_under_pace() {
+        // percent_used=0, month_used=50 → diff=-50 → Plenty left
+        assert_eq!(pace_label(0.0, 15, 30), "◎  Plenty left");
+    }
+
+    // ── daily_budget_text ─────────────────────────────────────────────────
+
+    #[test]
+    fn daily_budget_text_no_premium_quota_returns_none() {
+        let data = display_data(vec![unlimited("Chat")], 10, 30);
+        assert_eq!(daily_budget_text(&data), None);
+    }
+
+    #[test]
+    fn daily_budget_text_unlimited_premium_returns_none() {
+        let data = display_data(vec![unlimited("Premium")], 10, 30);
+        assert_eq!(daily_budget_text(&data), None);
+    }
+
+    #[test]
+    fn daily_budget_text_zero_days_remaining_returns_none() {
+        let data = display_data(vec![metered("Premium", 100, 300, 33.3)], 0, 30);
+        assert_eq!(daily_budget_text(&data), None);
+    }
+
+    #[test]
+    fn daily_budget_text_negative_days_remaining_returns_none() {
+        let data = display_data(vec![metered("Premium", 100, 300, 33.3)], -1, 30);
+        assert_eq!(daily_budget_text(&data), None);
+    }
+
+    #[test]
+    fn daily_budget_text_normal_case() {
+        // 60 remaining, 10 days left → 6.0 per day
+        let data = display_data(vec![metered("Premium", 60, 300, 20.0)], 10, 30);
+        assert_eq!(
+            daily_budget_text(&data),
+            Some("You can use up to 6.0 premium requests per day until reset".to_string())
+        );
+    }
+
+    #[test]
+    fn daily_budget_text_fractional_budget_rounds_to_one_decimal() {
+        // 100 remaining, 3 days → 33.333… → displayed as "33.3"
+        let data = display_data(vec![metered("Premium", 100, 300, 33.3)], 3, 30);
+        assert_eq!(
+            daily_budget_text(&data),
+            Some("You can use up to 33.3 premium requests per day until reset".to_string())
+        );
+    }
+
+    #[test]
+    fn daily_budget_text_one_day_remaining() {
+        // 45 remaining, 1 day → 45.0 per day
+        let data = display_data(vec![metered("Premium", 45, 300, 15.0)], 1, 30);
+        assert_eq!(
+            daily_budget_text(&data),
+            Some("You can use up to 45.0 premium requests per day until reset".to_string())
+        );
+    }
+
+    #[test]
+    fn daily_budget_text_zero_remaining() {
+        // 0 remaining, 10 days → 0.0 per day
+        let data = display_data(vec![metered("Premium", 0, 300, 0.0)], 10, 30);
+        assert_eq!(
+            daily_budget_text(&data),
+            Some("You can use up to 0.0 premium requests per day until reset".to_string())
+        );
+    }
+
+    #[test]
+    fn daily_budget_text_uses_premium_label_not_other_quotas() {
+        // Even if other quotas are present, only "Premium" is used
+        let data = display_data(
+            vec![
+                metered("Chat", 100, 200, 50.0),
+                metered("Premium", 30, 300, 10.0),
+            ],
+            5,
+            30,
+        );
+        assert_eq!(
+            daily_budget_text(&data),
+            Some("You can use up to 6.0 premium requests per day until reset".to_string())
+        );
+    }
 }

@@ -42,6 +42,72 @@ impl QuotaInfo {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn quota(entitlement: u64, percent_remaining: f64, unlimited: bool) -> QuotaInfo {
+        QuotaInfo {
+            label: "Test".into(),
+            entitlement,
+            remaining: 0,
+            unlimited,
+            percent_remaining,
+        }
+    }
+
+    // percent_used ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn percent_used_normal() {
+        // 40% remaining → 60% used
+        let q = quota(300, 40.0, false);
+        assert_eq!(q.percent_used(), 60.0);
+    }
+
+    #[test]
+    fn percent_used_fully_remaining() {
+        // 100% remaining → 0% used
+        let q = quota(300, 100.0, false);
+        assert_eq!(q.percent_used(), 0.0);
+    }
+
+    #[test]
+    fn percent_used_fully_exhausted() {
+        // 0% remaining → 100% used
+        let q = quota(300, 0.0, false);
+        assert_eq!(q.percent_used(), 100.0);
+    }
+
+    #[test]
+    fn percent_used_unlimited_returns_zero() {
+        // unlimited flag short-circuits regardless of other fields
+        let q = quota(300, 40.0, true);
+        assert_eq!(q.percent_used(), 0.0);
+    }
+
+    #[test]
+    fn percent_used_zero_entitlement_returns_zero() {
+        // entitlement == 0 → guard returns 0.0
+        let q = quota(0, 40.0, false);
+        assert_eq!(q.percent_used(), 0.0);
+    }
+
+    #[test]
+    fn percent_used_zero_entitlement_and_unlimited_returns_zero() {
+        let q = quota(0, 0.0, true);
+        assert_eq!(q.percent_used(), 0.0);
+    }
+
+    #[test]
+    fn percent_used_fractional() {
+        // 33.3% remaining → 66.7% used
+        let q = quota(300, 33.3, false);
+        let expected = 100.0 - 33.3f64;
+        assert!((q.percent_used() - expected).abs() < 1e-10);
+    }
+}
+
 /// All data needed for display
 pub struct DisplayData {
     pub quotas: Vec<QuotaInfo>,
