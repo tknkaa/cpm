@@ -26,7 +26,6 @@ cpm
 # Choose a display style
 cpm --style progress  # default
 cpm --style text
-cpm --style graph
 
 # Skip API fetch and specify remaining percentage directly
 cpm --premium 23.4

@@ -1,11 +1,11 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::{
-    DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{BarChart, Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Gauge, Paragraph},
+    DefaultTerminal, Frame,
 };
 
 use crate::quota::{DisplayData, QuotaInfo};
@@ -14,7 +14,6 @@ use crate::quota::{DisplayData, QuotaInfo};
 pub enum DisplayStyle {
     Progress,
     Text,
-    Graph,
 }
 
 // ────────────────────────────────────────────
@@ -165,7 +164,6 @@ fn render(frame: &mut Frame, data: &DisplayData, style: &DisplayStyle) {
     match style {
         DisplayStyle::Progress => render_progress(frame, frame.area(), data),
         DisplayStyle::Text => render_text(frame, frame.area(), data),
-        DisplayStyle::Graph => render_graph(frame, frame.area(), data),
     }
 }
 
@@ -354,61 +352,6 @@ fn render_text(frame: &mut Frame, area: Rect, data: &DisplayData) {
             .title(" cpm - Copilot Quota "),
     );
     frame.render_widget(para, area);
-}
-
-// ────────────────────────────────────────────
-// Graph (bar chart) display
-// ────────────────────────────────────────────
-
-fn render_graph(frame: &mut Frame, area: Rect, data: &DisplayData) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Min(10), Constraint::Length(5)])
-        .split(area);
-
-    let month_used_pct =
-        (data.days_total - data.days_remaining) as u64 * 100 / data.days_total.max(1) as u64;
-
-    let mut bar_data: Vec<(String, u64)> = data
-        .quotas
-        .iter()
-        .filter(|q| !q.unlimited)
-        .map(|q| (q.label.clone(), q.percent_used() as u64))
-        .collect();
-    bar_data.push(("Month Elapsed".to_string(), month_used_pct));
-
-    let bars: Vec<(&str, u64)> = bar_data.iter().map(|(k, v)| (k.as_str(), *v)).collect();
-
-    let chart = BarChart::default()
-        .block(
-            Block::default()
-                .title(" Usage Rate (%) — [Press any key to exit] ")
-                .borders(Borders::ALL),
-        )
-        .data(&bars)
-        .bar_width(14)
-        .bar_gap(2)
-        .max(100)
-        .bar_style(Style::default().fg(Color::Yellow))
-        .value_style(
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        );
-    frame.render_widget(chart, chunks[0]);
-
-    let mut footer_lines = vec![Line::from(pace_summary(data))];
-    if let Some(budget_text) = daily_budget_text(data) {
-        footer_lines.push(Line::from(""));
-        footer_lines.push(Line::from(Span::styled(
-            budget_text,
-            Style::default().fg(Color::Cyan),
-        )));
-    }
-    let footer = Paragraph::new(footer_lines).block(Block::default().borders(Borders::TOP));
-    frame.render_widget(footer, chunks[1]);
 }
 
 // ────────────────────────────────────────────
