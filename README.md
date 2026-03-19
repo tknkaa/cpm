@@ -20,7 +20,7 @@ cargo install --git https://github.com/tknkaa/cpm
 ## Usage
 
 ```bash
-# Fetch quota automatically via GitHub API
+# Fetch quota automatically via Copilot Internal API
 cpm
 
 # Choose a display style
