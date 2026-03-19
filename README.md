@@ -38,7 +38,7 @@ Press any key to exit.
 
 ## How it works
 
-`gh auth token` is used to retrieve your GitHub OAuth token, which is then used to call the GitHub API and fetch your current quota snapshot. If the API call fails, cpm falls back to a TUI prompt where you can enter the remaining percentage manually (visible in your GitHub billing settings).
+`gh api` is used to call the GitHub API and fetch your current quota snapshot, using gh's built-in authentication. If the API call fails, cpm falls back to a TUI prompt where you can enter the remaining percentage manually (visible in your GitHub billing settings).
 
 ## Requirements
 

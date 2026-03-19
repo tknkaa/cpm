@@ -1,39 +1,17 @@
-use anyhow::{Context, Result};
-use std::process::Command;
-
 use crate::quota::CopilotUserResponse;
+use anyhow::{Context, Result};
 
-/// Get token with `gh auth token` and call REST API directly
+/// Call REST API via `gh api` (uses gh's built-in auth and User-Agent)
 pub fn fetch() -> Result<CopilotUserResponse> {
-    let token = get_token()?;
-
-    let response = reqwest::blocking::Client::new()
-        .get("https://api.github.com/copilot_internal/user")
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "cpm")
-        .send()
-        .context("API request failed")?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("API returned error: {}", response.status());
-    }
-
-    response.json().context("Failed to parse JSON")
-}
-
-fn get_token() -> Result<String> {
-    let output = Command::new("gh")
-        .args(["auth", "token"])
+    let output = std::process::Command::new("gh")
+        .args(["api", "/copilot_internal/user"])
         .output()
-        .context("gh command not found. Please install GitHub CLI (gh).")?;
+        .context("gh command failed")?;
 
     if !output.status.success() {
-        anyhow::bail!("Failed to get gh auth token. Please login with `gh auth login`.");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("gh api returned error: {}", stderr);
     }
 
-    Ok(String::from_utf8(output.stdout)
-        .context("Failed to convert token to UTF-8")?
-        .trim()
-        .to_string())
+    serde_json::from_slice(&output.stdout).context("Failed to parse JSON")
 }
