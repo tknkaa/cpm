@@ -23,7 +23,6 @@ pub enum DisplayStyle {
 /// Prompt for the remaining percentage of premium_interactions in the TUI.
 /// Example input: "23.4" → returns 23.4f64
 pub fn prompt_premium_percent() -> Result<f64> {
-    color_eyre::install().ok();
     let mut terminal = ratatui::init();
     let result = run_prompt(&mut terminal);
     ratatui::restore();
@@ -137,7 +136,6 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 // ────────────────────────────────────────────
 
 pub fn render_and_wait(data: DisplayData, style: &DisplayStyle) -> Result<()> {
-    color_eyre::install().ok();
     let mut terminal = ratatui::init();
     let result = run_app(&mut terminal, &data, style);
     ratatui::restore();
