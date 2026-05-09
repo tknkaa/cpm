@@ -1,1 +1,10 @@
-/target
+.direnv/
+node_modules/
+target/
+.venv/
+dist/
+build/
+.env
+.DS_Store
+coverage/
+
