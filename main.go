@@ -52,7 +52,7 @@ func render(result Response) {
 	elapsed := now.Day()
 	elapsedPercent := float64(elapsed) / float64(daysInMonth) * 100
 
-	header := cyan.Render("GitHub Copilot Quota") + plain.Render(fmt.Sprintf(" Reset: %s %d days remaining", resetDate, daysRemaining))
+	header := cyan.Render(" GitHub Copilot Quota")
 	fmt.Println(header)
 	fmt.Println(strings.Repeat("\u2500", termWidth))
 
@@ -86,8 +86,9 @@ func render(result Response) {
 	fmt.Println(strings.Repeat("\u2500", termWidth))
 
 	perDay := p.QuotaRemaining / float64(daysRemaining)
-	fmt.Println(status)
-	fmt.Println(cyan.Render(fmt.Sprintf("You can use up to %.1f premium requests per day until reset", perDay)))
+	fmt.Println(plain.Render(fmt.Sprintf(" Reset: %s (%d days remaining)", resetDate, daysRemaining)))
+	fmt.Println(" Status: " + status)
+	fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f premium requests per day until reset", perDay)))
 }
 
 func main() {
