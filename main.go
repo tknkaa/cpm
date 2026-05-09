@@ -13,10 +13,9 @@ import (
 )
 
 type QuotaSnapshot struct {
-	PercentRemaining float64 `json:"percent_remaining"`
-	QuotaRemaining   float64 `json:"quota_remaining"`
-	Unlimited        bool    `json:"unlimited"`
-	Entitlement      int     `json:"entitlement"`
+	QuotaRemaining float64 `json:"quota_remaining"`
+	Unlimited      bool    `json:"unlimited"`
+	Entitlement    int     `json:"entitlement"`
 }
 
 type QuotaSnapshots struct {
@@ -48,6 +47,10 @@ func render(result Response) {
 
 	t, _ := time.Parse("2006-01-02", resetDate)
 	daysRemaining := int(time.Until(t).Hours()/24) + 1
+	now := time.Now()
+	daysInMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	elapsed := now.Day()
+	elapsedPercent := float64(elapsed) / float64(daysInMonth) * 100
 
 	header := cyan.Render("GitHub Copilot Quota") + plain.Render(fmt.Sprintf(" Reset: %s %d days remaining", resetDate, daysRemaining))
 	fmt.Println(header)
@@ -55,22 +58,35 @@ func render(result Response) {
 
 	p := result.QuotaSnapshots.PremiumInteractions
 	used := p.Entitlement - int(p.QuotaRemaining)
+	usedPercent := float64(used) / float64(p.Entitlement) * 100
+	var status string
+	barColor := "#00D787"
+	diff := usedPercent - elapsedPercent
+
+	if diff > 15 {
+		status = "Overusing"
+		barColor = "#FF0000"
+	} else if diff > 5 {
+		status = "Slightly fast"
+	} else if diff < -10 {
+		status = "Plenty left"
+	} else {
+		status = "Good pace"
+	}
+
 	barWidth := termWidth - 2
+	percentRemaining := p.QuotaRemaining / float64(p.Entitlement) * 100
 	fmt.Printf(" Premium Requests %d/%d used (%.1f%% remaining)\n",
-		used, p.Entitlement, p.PercentRemaining)
-	fmt.Println(" " + renderBar(100-p.PercentRemaining, barWidth, "42"))
+		used, p.Entitlement, percentRemaining)
+	fmt.Println(" " + renderBar(100-percentRemaining, barWidth, barColor))
 	fmt.Println(strings.Repeat("\u2500", termWidth))
 
-	now := time.Now()
-	daysInMonth := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
-	elapsed := now.Day()
-	elapsedPercent := float64(elapsed) / float64(daysInMonth) * 100
-	fmt.Printf(" Month Progress %d/%d days elapsed (%.0f%% elapsed)\n", elapsed, daysInMonth, elapsedPercent)
-	fmt.Println(" " + renderBar(elapsedPercent, barWidth, "63"))
+	fmt.Printf(" Month Progress %d/%d days elapsed (%.1f%% elapsed)\n", elapsed, daysInMonth, elapsedPercent)
+	fmt.Println(" " + renderBar(elapsedPercent, barWidth, "#0EA5E9"))
 	fmt.Println(strings.Repeat("\u2500", termWidth))
 
 	perDay := p.QuotaRemaining / float64(daysRemaining)
-	fmt.Println("Plenty left")
+	fmt.Println(status)
 	fmt.Println(cyan.Render(fmt.Sprintf("You can use up to %.1f premium requests per day until reset", perDay)))
 }
 
