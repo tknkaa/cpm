@@ -7,7 +7,7 @@ A TUI tool that compares your remaining GitHub Copilot Premium requests against 
 > It may break without notice if GitHub changes their API.
 > Use at your own risk.
 
-![demo](demo.png)
+![demo](sample.png)
 
 ## Installation
 
