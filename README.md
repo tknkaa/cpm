@@ -11,7 +11,7 @@ A TUI tool that compares your remaining GitHub Copilot Premium requests against 
 
 ## Installation
 
-### cargo
+### go
 
 ```bash
 go install github.com/tknkaa/cpm@latest
