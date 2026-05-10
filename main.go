@@ -36,14 +36,24 @@ func renderBar(percent float64, width int, color string) string {
 	return filledStyle.Render(strings.Repeat(" ", filled)) + emptyStyle.Render(strings.Repeat(" ", width-filled))
 }
 
-func renderSnapshot(kind string, snapshot QuotaSnapshot, termWidth int, elapsedPercent float64, daysRemaining int) (string, string, float64) {
+type SnapshotToRender struct {
+	rendered string
+	status   string
+	perDay   float64
+}
+
+func renderSnapshot(label string, snapshot QuotaSnapshot, termWidth int, elapsedPercent float64, daysRemaining int) SnapshotToRender {
 	barWidth := termWidth - 2
 	p := snapshot
 	if p.Unlimited {
-		header := fmt.Sprintf(" %s Unlimited\n", kind)
+		header := fmt.Sprintf(" %s Unlimited\n", label)
 		bar := " " + renderBar(0, barWidth, "#00D787") + "\n"
 		underline := strings.Repeat("\u2500", termWidth) + "\n"
-		return header + bar + underline, "Unlimited", 0
+		return SnapshotToRender{
+			rendered: header + bar + underline,
+			status:   "Unlimited",
+			perDay:   0,
+		}
 	}
 	used := p.Entitlement - int(p.QuotaRemaining)
 	usedPercent := float64(used) / float64(p.Entitlement) * 100
@@ -64,11 +74,15 @@ func renderSnapshot(kind string, snapshot QuotaSnapshot, termWidth int, elapsedP
 
 	percentRemaining := p.QuotaRemaining / float64(p.Entitlement) * 100
 	header := fmt.Sprintf(" %s %d/%d used (%.1f%% remaining)\n",
-		kind, used, p.Entitlement, percentRemaining)
+		label, used, p.Entitlement, percentRemaining)
 	bar := " " + renderBar(100-percentRemaining, barWidth, barColor) + "\n"
 	underline := strings.Repeat("\u2500", termWidth) + "\n"
 	perDay := p.QuotaRemaining / float64(daysRemaining)
-	return header + bar + underline, status, perDay
+	return SnapshotToRender{
+		rendered: header + bar + underline,
+		status:   status,
+		perDay:   perDay,
+	}
 }
 
 func render(result Response) {
@@ -94,19 +108,19 @@ func render(result Response) {
 	fmt.Println(strings.Repeat("\u2500", termWidth))
 
 	// render premium interactions
-	premiumShapshot := result.QuotaSnapshots.PremiumInteractions
-	premiumReqSnapshot, premiumReqStatus, premiumReqPerDay := renderSnapshot("Premium Requests", premiumShapshot, termWidth, elapsedPercent, daysRemaining)
-	fmt.Println(premiumReqSnapshot)
+	premiumSnapshot := result.QuotaSnapshots.PremiumInteractions
+	premium := renderSnapshot("Premium Requests", premiumSnapshot, termWidth, elapsedPercent, daysRemaining)
+	fmt.Println(premium.rendered)
 
 	// render completions
-	completonSnapshot := result.QuotaSnapshots.Completions
-	completionsSnapshot, completionsStatus, compleletionPerDay := renderSnapshot("Inline Suggestions", completonSnapshot, termWidth, elapsedPercent, daysRemaining)
-	fmt.Println(completionsSnapshot)
+	completionsSnapshot := result.QuotaSnapshots.Completions
+	completions := renderSnapshot("Inline Suggestions", completionsSnapshot, termWidth, elapsedPercent, daysRemaining)
+	fmt.Println(completions.rendered)
 
 	// render chat
-	chatSnapshotData := result.QuotaSnapshots.Chat
-	chatSnapshot, chatStatus, chatPerDay := renderSnapshot("Chat", chatSnapshotData, termWidth, elapsedPercent, daysRemaining)
-	fmt.Println(chatSnapshot)
+	chatSnapshot := result.QuotaSnapshots.Chat
+	chat := renderSnapshot("Chat", chatSnapshot, termWidth, elapsedPercent, daysRemaining)
+	fmt.Println(chat.rendered)
 
 	// render month progress
 	fmt.Printf(" Month Progress %d/%d days elapsed (%.1f%% elapsed)\n", elapsed, daysInMonth, elapsedPercent)
@@ -114,19 +128,19 @@ func render(result Response) {
 	fmt.Println(strings.Repeat("\u2500", termWidth))
 
 	fmt.Println(plain.Render(fmt.Sprintf(" Reset: %s (%d days remaining)", resetDate, daysRemaining)))
-	fmt.Println(" Premium Requests: " + premiumReqStatus)
+	fmt.Println(" Premium Requests: " + premium.status)
 
-	if !premiumShapshot.Unlimited {
-		fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f premium requests per day until reset", premiumReqPerDay)))
+	if !premiumSnapshot.Unlimited {
+		fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f premium requests per day until reset", premium.perDay)))
 	}
-	fmt.Println(" Inline Suggestions: " + completionsStatus)
+	fmt.Println(" Inline Suggestions: " + completions.status)
 
-	if !completonSnapshot.Unlimited {
-		fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f inline suggestions per day until reset", compleletionPerDay)))
+	if !completionsSnapshot.Unlimited {
+		fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f inline suggestions per day until reset", completions.perDay)))
 	}
-	fmt.Println(" Chat: " + chatStatus)
-	if !chatSnapshotData.Unlimited {
-		fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f chat interactions per day until reset", chatPerDay)))
+	fmt.Println(" Chat: " + chat.status)
+	if !chatSnapshot.Unlimited {
+		fmt.Println(cyan.Render(fmt.Sprintf(" You can use up to %.1f chat interactions per day until reset", chat.perDay)))
 	}
 }
 
