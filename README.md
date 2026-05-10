@@ -14,7 +14,7 @@ A TUI tool that compares your remaining GitHub Copilot Premium requests against 
 ### cargo
 
 ```bash
-cargo install --git https://github.com/tknkaa/cpm
+go install github.com/tknkaa/cpm@latest
 ```
 
 ## Usage
@@ -22,19 +22,7 @@ cargo install --git https://github.com/tknkaa/cpm
 ```bash
 # Fetch quota automatically via Copilot Internal API
 cpm
-
-# Choose a display style
-cpm -s progress   # default
-cpm -s text
-cpm --style progress
-cpm --style text
-
-# Skip API fetch and specify remaining percentage directly
-cpm -p 23.4
-cpm --percent 23.4
 ```
-
-Press any key to exit.
 
 ## How it works
 
